@@ -1,0 +1,389 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Which witch are you?</title>
+<style>
+  :root {
+    --bg: #f7f5f0; --card: #ffffff; --text: #1f1d1a; --muted: #6b6760; --border: #dcd8cf;
+    --accent: #5b4bb7; --accent-soft: #eeedfe; --danger: #a32d2d;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #161514; --card: #201f1d; --text: #ecebe6; --muted: #a09d95; --border: #3a3834;
+      --accent: #afa9ec; --accent-soft: #2a2650; --danger: #f09595;
+    }
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--bg); color: var(--text); font: 16px/1.6 -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; }
+  main { max-width: 820px; margin: 0 auto; padding: 2rem 1.25rem 4rem; }
+  h1 { font: 500 30px/1.2 Georgia, serif; margin: 0 0 0.25rem; }
+  .subtitle { color: var(--muted); margin: 0 0 2rem; }
+  .progress-labels { display: flex; justify-content: space-between; font-size: 13px; color: var(--muted); margin-bottom: 6px; }
+  .bar { height: 6px; border-radius: 3px; background: var(--border); overflow: hidden; }
+  .bar > div { height: 100%; background: var(--accent); transition: width 0.25s; }
+  h2 { font: 500 22px/1.3 Georgia, serif; margin: 1.75rem 0 1rem; }
+  .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(180px, 1fr)); gap: 12px; }
+  .list { display: grid; gap: 8px; }
+  button { font: inherit; color: inherit; cursor: pointer; }
+  .option { display: flex; align-items: center; gap: 12px; text-align: left; padding: 12px 14px; background: var(--card); border: 1px solid var(--border); border-radius: 10px; }
+  .option:hover { border-color: var(--muted); }
+  .option.selected { outline: 3px solid var(--accent); border-color: transparent; background: var(--accent-soft); }
+  .photo-option { flex-direction: column; align-items: stretch; padding: 0; overflow: hidden; gap: 0; }
+  .photo-option img, .photo-option .no-photo { width: 100%; aspect-ratio: 4 / 3; object-fit: cover; display: block; background: var(--border); }
+  .photo-option .no-photo { display: flex; align-items: center; justify-content: center; color: var(--muted); font-size: 13px; }
+  .photo-option span { padding: 10px 12px; font-size: 14px; }
+  .swatches { display: flex; gap: 0; width: 72px; height: 32px; border-radius: 6px; overflow: hidden; flex-shrink: 0; }
+  .swatches i { flex: 1; }
+  .error { color: var(--danger); font-size: 14px; min-height: 22px; margin: 10px 0 0; }
+  .nav { display: flex; justify-content: space-between; margin-top: 6px; }
+  .nav button, .actions button { padding: 10px 18px; border-radius: 8px; border: 1px solid var(--border); background: var(--card); }
+  .nav button.primary { background: var(--accent); border-color: var(--accent); color: var(--bg); }
+  .result-card { background: var(--card); border: 1px solid var(--border); border-radius: 14px; overflow: hidden; }
+  .result-card img { width: 100%; height: 260px; object-fit: cover; display: block; }
+  .result-body { padding: 1.25rem 1.5rem 1.5rem; }
+  .result-body .eyebrow { color: var(--muted); font-size: 14px; margin: 0; }
+  .result-body h2 { margin: 0.25rem 0 0.75rem; font-size: 30px; }
+  .result-body p { margin: 0; font-family: Georgia, serif; font-size: 17px; }
+  .runner { display: flex; align-items: center; gap: 12px; margin: 0 0 8px; font-size: 15px; }
+  .runner .name { width: 170px; }
+  .runner .bar { flex: 1; height: 8px; }
+  .runner .score { width: 28px; text-align: right; color: var(--muted); font-size: 13px; }
+  .actions { margin-top: 1.5rem; }
+  details { margin-top: 3rem; font-size: 13px; color: var(--muted); }
+  details li { margin-bottom: 4px; }
+  details a { color: var(--muted); }
+</style>
+</head>
+<body>
+<main>
+  <h1>Which witch are you?</h1>
+  <p class="subtitle">13 questions about what you like. None of them are about magic.</p>
+
+  <section id="quiz">
+    <div class="progress-labels"><span id="count"></span><span id="percent"></span></div>
+    <div class="bar"><div id="progress"></div></div>
+    <h2 id="question"></h2>
+    <div id="options"></div>
+    <p class="error" id="error" role="alert"></p>
+    <div class="nav">
+      <button id="back">← Back</button>
+      <button id="next" class="primary">Next →</button>
+    </div>
+  </section>
+
+  <section id="result" hidden></section>
+
+  <details>
+    <summary>Photo credits</summary>
+    <p>All photos are from Wikimedia Commons under the licences shown.</p>
+    <ul id="credits"></ul>
+  </details>
+</main>
+
+<script>
+// Photo metadata comes from the Wikimedia Commons API, picked by hand
+const PHOTOS = {"p_stars": {"title": "File:Starry night at the Atacama Desert coast (gerd huedepohl 9).jpg", "thumb": "https://thumb.wikimedia.org/wikipedia/commons/thumb/4/4b/Starry_night_at_the_Atacama_Desert_coast_%28gerd_huedepohl_9%29.jpg/960px-Starry_night_at_the_Atacama_Desert_coast_%28gerd_huedepohl_9%29.jpg", "page": "https://commons.wikimedia.org/wiki/File:Starry_night_at_the_Atacama_Desert_coast_(gerd_huedepohl_9).jpg", "artist": "G. Hüdepohl (atacamaphoto.com)/ESO", "license": "CC BY 4.0"}, "p_moonlake": {"title": "File:Moon and the lake.jpg", "thumb": "https://thumb.wikimedia.org/wikipedia/commons/thumb/2/21/Moon_and_the_lake.jpg/960px-Moon_and_the_lake.jpg", "page": "https://commons.wikimedia.org/wiki/File:Moon_and_the_lake.jpg", "artist": "SATHYA GEORGIA", "license": "CC BY-SA 4.0"}, "p_greenhouse": {"title": "File:Walbrzych Palm House greenhouse interior 2019.jpg", "thumb": "https://thumb.wikimedia.org/wikipedia/commons/thumb/7/78/Walbrzych_Palm_House_greenhouse_interior_2019.jpg/960px-Walbrzych_Palm_House_greenhouse_interior_2019.jpg", "page": "https://commons.wikimedia.org/wiki/File:Walbrzych_Palm_House_greenhouse_interior_2019.jpg", "artist": "Adrian Tync", "license": "CC BY-SA 4.0"}, "p_kitchen": {"title": "File:Pan casero tradicional de la provincia de Misiones, Argentina.jpg", "thumb": "https://thumb.wikimedia.org/wikipedia/commons/thumb/e/ec/Pan_casero_tradicional_de_la_provincia_de_Misiones%2C_Argentina.jpg/960px-Pan_casero_tradicional_de_la_provincia_de_Misiones%2C_Argentina.jpg", "page": "https://commons.wikimedia.org/wiki/File:Pan_casero_tradicional_de_la_provincia_de_Misiones,_Argentina.jpg", "artist": "Horacio Cambeiro", "license": "CC BY-SA 3.0"}, "p_forest": {"title": "File:Walking through Kollur misty forest path.jpg", "thumb": "https://thumb.wikimedia.org/wikipedia/commons/thumb/1/15/Walking_through_Kollur_misty_forest_path.jpg/960px-Walking_through_Kollur_misty_forest_path.jpg", "page": "https://commons.wikimedia.org/wiki/File:Walking_through_Kollur_misty_forest_path.jpg", "artist": "Kaitha Poo Manam", "license": "CC BY-SA 4.0"}, "p_geode": {"title": "File:Amethyst-geode both 020 7766.jpg", "thumb": "https://thumb.wikimedia.org/wikipedia/commons/thumb/1/11/Amethyst-geode_both_020_7766.jpg/960px-Amethyst-geode_both_020_7766.jpg", "page": "https://commons.wikimedia.org/wiki/File:Amethyst-geode_both_020_7766.jpg", "artist": "Ludvig14", "license": "CC BY-SA 4.0"}, "p_glass": {"title": "File:Stained Glass Interior - stairwell windows.jpg", "thumb": "https://upload.wikimedia.org/wikipedia/commons/6/69/Stained_Glass_Interior_-_stairwell_windows.jpg", "page": "https://commons.wikimedia.org/wiki/File:Stained_Glass_Interior_-_stairwell_windows.jpg", "artist": "Chris Light", "license": "CC BY-SA 4.0"}, "p_portraits": {"title": "File:Pile Alle - Frederiksberg Old Police Station.jpg", "thumb": "https://upload.wikimedia.org/wikipedia/commons/f/f2/Pile_Alle_-_Frederiksberg_Old_Police_Station.jpg", "page": "https://commons.wikimedia.org/wiki/File:Pile_Alle_-_Frederiksberg_Old_Police_Station.jpg", "artist": "unknown author", "license": "Public domain"}, "s_stones": {"title": "File:Polished pebbles (41), eroded by wind and water, and two crystals, carnelian, quartz, and other semi-precious stones - Museo Egizio Turin P 3540 p02.jpg", "thumb": "https://thumb.wikimedia.org/wikipedia/commons/thumb/b/b1/Polished_pebbles_%2841%29%2C_eroded_by_wind_and_water%2C_and_two_crystals%2C_carnelian%2C_quartz%2C_and_other_semi-precious_stones_-_Museo_Egizio_Turin_P_3540_p02.jpg/960px-Polished_pebbles_%2841%29%2C_eroded_by_wind_and_water%2C_and_two_crystals%2C_carnelian%2C_quartz%2C_and_other_semi-precious_stones_-_Museo_Egizio_Turin_P_3540_p02.jpg", "page": "https://commons.wikimedia.org/wiki/File:Polished_pebbles_(41),_eroded_by_wind_and_water,_and_two_crystals,_carnelian,_quartz,_and_other_semi-precious_stones_-_Museo_Egizio_Turin_P_3540_p02.jpg", "artist": "", "license": "CC0"}, "s_cuttings": {"title": "File:Комнатная мята.jpg", "thumb": "https://thumb.wikimedia.org/wikipedia/commons/thumb/b/bb/%D0%9A%D0%BE%D0%BC%D0%BD%D0%B0%D1%82%D0%BD%D0%B0%D1%8F_%D0%BC%D1%8F%D1%82%D0%B0.jpg/960px-%D0%9A%D0%BE%D0%BC%D0%BD%D0%B0%D1%82%D0%BD%D0%B0%D1%8F_%D0%BC%D1%8F%D1%82%D0%B0.jpg", "page": "https://commons.wikimedia.org/wiki/File:%D0%9A%D0%BE%D0%BC%D0%BD%D0%B0%D1%82%D0%BD%D0%B0%D1%8F_%D0%BC%D1%8F%D1%82%D0%B0.jpg", "artist": "MarDe", "license": "CC BY 4.0"}, "s_recipe": {"title": "File:Orange cake - Handwritten 2024-05-21 103943 page 1.jpg", "thumb": "https://thumb.wikimedia.org/wikipedia/commons/thumb/b/b2/Orange_cake_-_Handwritten_2024-05-21_103943_page_1.jpg/960px-Orange_cake_-_Handwritten_2024-05-21_103943_page_1.jpg", "page": "https://commons.wikimedia.org/wiki/File:Orange_cake_-_Handwritten_2024-05-21_103943_page_1.jpg", "artist": "SJW", "license": "CC BY-SA 4.0"}, "s_moon": {"title": "File:Moon phases and visible features.jpg", "thumb": "https://thumb.wikimedia.org/wikipedia/commons/thumb/3/38/Moon_phases_and_visible_features.jpg/960px-Moon_phases_and_visible_features.jpg", "page": "https://commons.wikimedia.org/wiki/File:Moon_phases_and_visible_features.jpg", "artist": "Unmismoobjetivo", "license": "CC BY-SA 4.0"}, "s_folklore": {"title": "File:1910s ILLUSTRATION FAIRY TALE PRINCE AND DRAGON BY WARWICK GOBLE.jpg", "thumb": "https://thumb.wikimedia.org/wikipedia/commons/thumb/d/da/1910s_ILLUSTRATION_FAIRY_TALE_PRINCE_AND_DRAGON_BY_WARWICK_GOBLE.jpg/960px-1910s_ILLUSTRATION_FAIRY_TALE_PRINCE_AND_DRAGON_BY_WARWICK_GOBLE.jpg", "page": "https://commons.wikimedia.org/wiki/File:1910s_ILLUSTRATION_FAIRY_TALE_PRINCE_AND_DRAGON_BY_WARWICK_GOBLE.jpg", "artist": "Warwick Goble", "license": "Public domain"}, "s_gothic": {"title": "File:Cornelis Norbertus Gijsbrechts - Vanitas still life with a skull, sheet music, violin, globe, candle, hourglass and playing cards, all on a draped table.jpg", "thumb": "https://thumb.wikimedia.org/wikipedia/commons/thumb/0/08/Cornelis_Norbertus_Gijsbrechts_-_Vanitas_still_life_with_a_skull%2C_sheet_music%2C_violin%2C_globe%2C_candle%2C_hourglass_and_playing_cards%2C_all_on_a_draped_table.jpg/960px-Cornelis_Norbertus_Gijsbrechts_-_Vanitas_still_life_with_a_skull%2C_sheet_music%2C_violin%2C_globe%2C_candle%2C_hourglass_and_playing_cards%2C_all_on_a_draped_table.jpg", "page": "https://commons.wikimedia.org/wiki/File:Cornelis_Norbertus_Gijsbrechts_-_Vanitas_still_life_with_a_skull,_sheet_music,_violin,_globe,_candle,_hourglass_and_playing_cards,_all_on_a_draped_table.jpg", "artist": "Cornelis Norbertus Gijsbrechts", "license": "Public domain"}, "w_storm": {"title": "File:Port and lighthouse overnight storm with lightning in Port-la-Nouvelle.jpg", "thumb": "https://thumb.wikimedia.org/wikipedia/commons/thumb/c/c2/Port_and_lighthouse_overnight_storm_with_lightning_in_Port-la-Nouvelle.jpg/960px-Port_and_lighthouse_overnight_storm_with_lightning_in_Port-la-Nouvelle.jpg", "page": "https://commons.wikimedia.org/wiki/File:Port_and_lighthouse_overnight_storm_with_lightning_in_Port-la-Nouvelle.jpg", "artist": "Maxime Raynal from France", "license": "CC BY 2.0"}, "w_coldnight": {"title": "File:Stars in winter over Brofjorden at Sandvik 1.jpg", "thumb": "https://thumb.wikimedia.org/wikipedia/commons/thumb/2/23/Stars_in_winter_over_Brofjorden_at_Sandvik_1.jpg/960px-Stars_in_winter_over_Brofjorden_at_Sandvik_1.jpg", "page": "https://commons.wikimedia.org/wiki/File:Stars_in_winter_over_Brofjorden_at_Sandvik_1.jpg", "artist": "W.carter", "license": "CC BY-SA 4.0"}, "w_fog": {"title": "File:Foggy morning at snowy field.jpg", "thumb": "https://thumb.wikimedia.org/wikipedia/commons/thumb/a/ab/Foggy_morning_at_snowy_field.jpg/960px-Foggy_morning_at_snowy_field.jpg", "page": "https://commons.wikimedia.org/wiki/File:Foggy_morning_at_snowy_field.jpg", "artist": "JC Essentials ;)", "license": "CC BY 2.0"}, "w_rain": {"title": "File:Frangapini Apricot Rain Drops-7+ (2265769883).jpg", "thumb": "https://thumb.wikimedia.org/wikipedia/commons/thumb/6/6c/Frangapini_Apricot_Rain_Drops-7%2B_%282265769883%29.jpg/960px-Frangapini_Apricot_Rain_Drops-7%2B_%282265769883%29.jpg", "page": "https://commons.wikimedia.org/wiki/File:Frangapini_Apricot_Rain_Drops-7%2B_(2265769883).jpg", "artist": "Sheba_Also 43,000 photos", "license": "CC BY-SA 2.0"}, "w_snowtea": {"title": "File:There is plenty of snow outside! (8348743838).jpg", "thumb": "https://thumb.wikimedia.org/wikipedia/commons/thumb/5/5a/There_is_plenty_of_snow_outside%21_%288348743838%29.jpg/960px-There_is_plenty_of_snow_outside%21_%288348743838%29.jpg", "page": "https://commons.wikimedia.org/wiki/File:There_is_plenty_of_snow_outside!_(8348743838).jpg", "artist": "shankar s. from Dubai, united arab emirates", "license": "CC BY 2.0"}, "w_golden": {"title": "File:Nottuln, Gladbeck, Grashalm -- 2024 -- 4342.jpg", "thumb": "https://thumb.wikimedia.org/wikipedia/commons/thumb/f/f0/Nottuln%2C_Gladbeck%2C_Grashalm_--_2024_--_4342.jpg/960px-Nottuln%2C_Gladbeck%2C_Grashalm_--_2024_--_4342.jpg", "page": "https://commons.wikimedia.org/wiki/File:Nottuln,_Gladbeck,_Grashalm_--_2024_--_4342.jpg", "artist": "Dietmar Rabich", "license": "CC BY-SA 4.0"}, "t_cliffs": {"title": "File:Sydney (AU), Coast, Australian Fur Seals -- 2019 -- 3450.jpg", "thumb": "https://thumb.wikimedia.org/wikipedia/commons/thumb/6/61/Sydney_%28AU%29%2C_Coast%2C_Australian_Fur_Seals_--_2019_--_3450.jpg/960px-Sydney_%28AU%29%2C_Coast%2C_Australian_Fur_Seals_--_2019_--_3450.jpg", "page": "https://commons.wikimedia.org/wiki/File:Sydney_(AU),_Coast,_Australian_Fur_Seals_--_2019_--_3450.jpg", "artist": "Dietmar Rabich", "license": "CC BY-SA 4.0"}, "t_homeland": {"title": "File:World Map 1689.JPG", "thumb": "https://thumb.wikimedia.org/wikipedia/commons/thumb/3/3b/World_Map_1689.JPG/960px-World_Map_1689.JPG", "page": "https://commons.wikimedia.org/wiki/File:World_Map_1689.JPG", "artist": "Gerard van Schagen", "license": "Public domain"}, "t_darksky": {"title": "File:Dark clouds and a starry night sky (potw2639a).jpg", "thumb": "https://thumb.wikimedia.org/wikipedia/commons/thumb/9/9d/Dark_clouds_and_a_starry_night_sky_%28potw2639a%29.jpg/960px-Dark_clouds_and_a_starry_night_sky_%28potw2639a%29.jpg", "page": "https://commons.wikimedia.org/wiki/File:Dark_clouds_and_a_starry_night_sky_(potw2639a).jpg", "artist": "J. Rodrigues/ESO", "license": "CC BY 4.0"}, "t_cottage": {"title": "File:The Cottage - geograph.org.uk - 54724.jpg", "thumb": "https://upload.wikimedia.org/wikipedia/commons/b/bd/The_Cottage_-_geograph.org.uk_-_54724.jpg", "page": "https://commons.wikimedia.org/wiki/File:The_Cottage_-_geograph.org.uk_-_54724.jpg", "artist": "Ken Ballinger", "license": "CC BY-SA 2.0"}, "t_ruins": {"title": "File:Whitby Abbey ruins, Yorkshire.jpg", "thumb": "https://thumb.wikimedia.org/wikipedia/commons/thumb/0/0e/Whitby_Abbey_ruins%2C_Yorkshire.jpg/960px-Whitby_Abbey_ruins%2C_Yorkshire.jpg", "page": "https://commons.wikimedia.org/wiki/File:Whitby_Abbey_ruins,_Yorkshire.jpg", "artist": "Juliet220", "license": "CC BY-SA 3.0"}, "t_airport": {"title": "File:Departure board at Geneva Airport.jpg", "thumb": "https://thumb.wikimedia.org/wikipedia/commons/thumb/c/cf/Departure_board_at_Geneva_Airport.jpg/960px-Departure_board_at_Geneva_Airport.jpg", "page": "https://commons.wikimedia.org/wiki/File:Departure_board_at_Geneva_Airport.jpg", "artist": "Tiia Monto", "license": "CC BY-SA 3.0"}, "t_retreat": {"title": "File:The Meditation retreat.jpg", "thumb": "https://thumb.wikimedia.org/wikipedia/commons/thumb/6/63/The_Meditation_retreat.jpg/960px-The_Meditation_retreat.jpg", "page": "https://commons.wikimedia.org/wiki/File:The_Meditation_retreat.jpg", "artist": "Yuwathee", "license": "CC BY-SA 4.0"}, "c_bread": {"title": "File:Homemade Cinnamon rolls 06.jpg", "thumb": "https://thumb.wikimedia.org/wikipedia/commons/thumb/7/7b/Homemade_Cinnamon_rolls_06.jpg/960px-Homemade_Cinnamon_rolls_06.jpg", "page": "https://commons.wikimedia.org/wiki/File:Homemade_Cinnamon_rolls_06.jpg", "artist": "Pannet", "license": "CC BY 4.0"}, "c_soil": {"title": "File:Akar Pohon di Puncak Anai.jpg", "thumb": "https://thumb.wikimedia.org/wikipedia/commons/thumb/e/e2/Akar_Pohon_di_Puncak_Anai.jpg/960px-Akar_Pohon_di_Puncak_Anai.jpg", "page": "https://commons.wikimedia.org/wiki/File:Akar_Pohon_di_Puncak_Anai.jpg", "artist": "Muhamad Izzul Fiqih", "license": "CC BY-SA 4.0"}, "c_incense": {"title": "File:Incense in India.jpg", "thumb": "https://thumb.wikimedia.org/wikipedia/commons/thumb/b/b2/Incense_in_India.jpg/960px-Incense_in_India.jpg", "page": "https://commons.wikimedia.org/wiki/File:Incense_in_India.jpg", "artist": "4174332", "license": "CC0"}, "c_sea": {"title": "File:Sea Foam at Beavertail JamestownRI 20060109.jpg", "thumb": "https://thumb.wikimedia.org/wikipedia/commons/thumb/5/5f/Sea_Foam_at_Beavertail_JamestownRI_20060109.jpg/960px-Sea_Foam_at_Beavertail_JamestownRI_20060109.jpg", "page": "https://commons.wikimedia.org/wiki/File:Sea_Foam_at_Beavertail_JamestownRI_20060109.jpg", "artist": "Rhododendrites", "license": "CC BY-SA 3.0"}, "c_lavender": {"title": "File:Lavender field in Misato Town, Akita 20180624e.jpg", "thumb": "https://thumb.wikimedia.org/wikipedia/commons/thumb/3/3e/Lavender_field_in_Misato_Town%2C_Akita_20180624e.jpg/960px-Lavender_field_in_Misato_Town%2C_Akita_20180624e.jpg", "page": "https://commons.wikimedia.org/wiki/File:Lavender_field_in_Misato_Town,_Akita_20180624e.jpg", "artist": "掬茶", "license": "CC BY-SA 4.0"}, "c_campfire": {"title": "File:FIRE 01.JPG", "thumb": "https://thumb.wikimedia.org/wikipedia/commons/thumb/2/2a/FIRE_01.JPG/960px-FIRE_01.JPG", "page": "https://commons.wikimedia.org/wiki/File:FIRE_01.JPG", "artist": "MarcusObal", "license": "CC BY-SA 3.0"}};
+
+// key: [display name, photo used on the result card, description]
+const WITCH_TYPES = {
+  ecl: ["Eclectic witch", "s_folklore", "You collect what you love from everywhere and mix it into something that's yours. Curious, restless, allergic to one-size-fits-all."],
+  anc: ["Ancestral witch", "p_portraits", "You feel the pull of where you came from. Old photos, family stories, and the people before you matter to you."],
+  ang: ["Angel witch", "p_glass", "You're the gentle, comforting presence. Light, calm, and a quiet sense that someone is looking out for you."],
+  cer: ["Ceremonial witch", "t_ruins", "You love structure, ritual, and doing a thing properly. A good system feels like a gift, not a cage."],
+  cos: ["Cosmic witch", "p_stars", "You look up. Stars, planets, and the big picture help you make sense of life down here."],
+  cry: ["Crystal witch", "p_geode", "You're drawn to pretty, tactile things from the earth. Your shelf probably has a rock or three on it."],
+  drm: ["Dream witch", "w_fog", "Your inner world is vivid. You remember dreams, think in images, and process life while you sleep."],
+  ele: ["Elemental witch", "w_storm", "Weather, water, fire, and wind move you. You feel most alive when nature is being dramatic."],
+  nrg: ["Energy witch", "w_golden", "You read rooms, feel moods, and reset through breath and body. No props needed."],
+  grn: ["Green witch", "p_greenhouse", "Plants are your people. You grow, propagate, and nurture, and things tend to thrive around you."],
+  hed: ["Hedge rider", "p_forest", "You live a little on the edge of things. Fog, folklore, daydreams, and in-between places call you."],
+  kit: ["Kitchen witch", "c_bread", "Home is your craft. Food, tea, cosy rooms, and feeding the people you love."],
+  her: ["Hereditary witch", "s_recipe", "Family is where your knowledge lives. Recipes, sayings, and ways of doing things handed down to you."],
+  lun: ["Lunar witch", "p_moonlake", "You run on cycles and you come alive at night. The moon feels like an old friend."],
+  nat: ["Nature witch", "c_soil", "You need to be outside. Forests, trails, soil after rain: that's where you recharge."],
+  poi: ["Poison path witch", "s_gothic", "You like the dark, the strange, and the forbidden. Dark humour, gothic tastes, and deep curiosity."],
+  sec: ["Secular witch", "t_airport", "Practical and evidence-minded. You keep what works, drop what doesn't, and need it to make sense."],
+  tra: ["Traditional witch", "t_homeland", "Folklore, history, and old ways fascinate you. You respect things that have lasted."],
+  wic: ["Wiccan witch", "c_lavender", "You love marking the seasons and belonging to something with shared rhythm and values."],
+};
+
+// Each option: [label, photo key | swatch colours | null, points per witch type]
+const QUESTIONS = [
+  { text: "Which photo are you drawn to?", style: "photo", options: [
+    ["A night sky full of stars", "p_stars", { cos: 2, lun: 1 }],
+    ["A full moon over dark water", "p_moonlake", { lun: 2, ele: 1 }],
+    ["A greenhouse full of hanging plants", "p_greenhouse", { grn: 2, nat: 1 }],
+    ["A loaf of fresh bread on the counter", "p_kitchen", { kit: 2, her: 1 }],
+    ["A misty forest path", "p_forest", { nat: 2, hed: 1 }],
+    ["A cracked-open geode", "p_geode", { cry: 2 }],
+    ["Sunlight through stained glass", "p_glass", { ang: 2, cer: 1 }],
+    ["A faded sepia photo of an old street", "p_portraits", { anc: 2, her: 1, tra: 1 }],
+  ]},
+  { text: "Pick your colour palette", style: "swatch", options: [
+    ["Deep navy and silver", ["#0c1a3a", "#26355e", "#c4c9d4"], { cos: 2, lun: 1 }],
+    ["Moss and sage green", ["#3b4a2a", "#6f8a4e", "#b7c4a0"], { grn: 2, nat: 1 }],
+    ["Terracotta and cream", ["#a4502f", "#d9906b", "#f3e6d3"], { kit: 2, her: 1 }],
+    ["Black and deep plum", ["#111013", "#3e1838", "#6b2a5e"], { poi: 2, hed: 1 }],
+    ["Iridescent, all of them", ["#7fd1c7", "#b8a1e8", "#f2b5c9"], { ecl: 2, cry: 1 }],
+    ["White and soft gold", ["#fbfaf5", "#ead9a6", "#c9a85a"], { ang: 2, wic: 1 }],
+    ["Ocean blues and stormy greys", ["#1e4b66", "#5d8aa8", "#8e9599"], { ele: 2, drm: 1 }],
+  ]},
+  { text: "How do you spend a free Saturday?", style: "list", options: [
+    ["Baking or hosting people", null, { kit: 2 }],
+    ["Hiking or gardening", null, { nat: 2, grn: 1, ele: 1 }],
+    ["Napping, journaling, staying in my head", null, { drm: 2, nrg: 1 }],
+    ["Museums, old bookshops, family history sites", null, { anc: 2, tra: 1, her: 1 }],
+    ["Trying a hobby I discovered yesterday", null, { ecl: 2 }],
+    ["Stargazing or reading my birth chart", null, { cos: 2 }],
+    ["Yoga, meditation, breathwork", null, { nrg: 2 }],
+  ]},
+  { text: "How do you like to learn something new?", style: "list", options: [
+    ["A structured course, step by step", null, { cer: 2, wic: 1 }],
+    ["Bits from ten sources, remixed my way", null, { ecl: 2 }],
+    ["From an elder or someone in my family", null, { her: 2, anc: 1, tra: 1 }],
+    ["Hands on, by trial and error", null, { kit: 1, grn: 1, nrg: 1 }],
+    ["Show me the evidence and why it works", null, { sec: 2 }],
+    ["I just sort of know, intuitively", null, { drm: 1, hed: 1, nrg: 1 }],
+  ]},
+  { text: "What are your nights like?", style: "list", options: [
+    ["Vivid dreams I remember and write down", null, { drm: 2 }],
+    ["I daydream constantly, half somewhere else", null, { hed: 2, drm: 1 }],
+    ["Night owl. I'm at my best after dark", null, { lun: 2, cos: 1, poi: 1 }],
+    ["Early to bed, up with the sun", null, { nat: 1, kit: 1, ele: 1 }],
+    ["I sleep like a log, nothing to report", null, { sec: 2 }],
+  ]},
+  { text: "Which role do you play in your friend group?", style: "list", options: [
+    ["The one who feeds everyone", null, { kit: 2 }],
+    ["The calm one people come to for comfort", null, { ang: 2, grn: 1 }],
+    ["The keeper of traditions and yearly gatherings", null, { tra: 2, her: 1, wic: 1 }],
+    ["The wild card with the dark sense of humour", null, { poi: 2, ecl: 1 }],
+    ["The planner with the spreadsheet", null, { cer: 2 }],
+    ["The empath who reads the room", null, { nrg: 2 }],
+  ]},
+  { text: "What's sitting on your shelf?", style: "photo", options: [
+    ["A collection of pretty stones", "s_stones", { cry: 2 }],
+    ["Houseplants crowding the windowsill", "s_cuttings", { grn: 2 }],
+    ["A handwritten family recipe card", "s_recipe", { anc: 2, her: 2 }],
+    ["A moon phase chart", "s_moon", { lun: 2 }],
+    ["An old illustrated fairy tale book", "s_folklore", { tra: 2, hed: 1 }],
+    ["A still life with a skull and candles", "s_gothic", { poi: 2 }],
+    ["Nothing much. Clean and functional", null, { sec: 2 }],
+  ]},
+  { text: "Pick a weather", style: "photo", options: [
+    ["A wild thunderstorm", "w_storm", { ele: 2 }],
+    ["A clear, cold, starry night", "w_coldnight", { cos: 2, lun: 1 }],
+    ["A thick foggy morning", "w_fog", { hed: 2, drm: 1 }],
+    ["Rain on the garden", "w_rain", { nat: 2, grn: 1 }],
+    ["Snow piling up outside the window", "w_snowtea", { kit: 2 }],
+    ["Golden hour sunshine", "w_golden", { ang: 1, wic: 1, nrg: 1 }],
+  ]},
+  { text: "Where would you go on a trip?", style: "photo", options: [
+    ["Sea cliffs and crashing waves", "t_cliffs", { ele: 2 }],
+    ["Where my family comes from", "t_homeland", { anc: 2, tra: 1, her: 1 }],
+    ["A dark sky reserve", "t_darksky", { cos: 2 }],
+    ["A countryside cottage", "t_cottage", { kit: 1, nat: 1, grn: 1 }],
+    ["Ancient ruins and old abbeys", "t_ruins", { cer: 1, tra: 1, ang: 1 }],
+    ["Wherever. I'll decide at the airport", "t_airport", { ecl: 2 }],
+    ["A quiet meditation retreat", "t_retreat", { nrg: 2 }],
+  ]},
+  { text: "How do you feel about rules?", style: "list", options: [
+    ["I love a clear system", null, { cer: 2, wic: 1 }],
+    ["I respect them if they have history", null, { tra: 2, her: 1 }],
+    ["I write my own", null, { ecl: 2, sec: 1 }],
+    ["Only if they make sense to me", null, { sec: 2 }],
+    ["I'm curious about whatever's forbidden", null, { poi: 2 }],
+  ]},
+  { text: "Pick a comfort scent", style: "photo", options: [
+    ["Cinnamon buns in the oven", "c_bread", { kit: 2 }],
+    ["A damp forest floor after rain", "c_soil", { nat: 2, grn: 1 }],
+    ["Incense smoke", "c_incense", { cer: 1, ang: 1, wic: 1 }],
+    ["Sea foam and salt spray", "c_sea", { ele: 2 }],
+    ["Fields of lavender", "c_lavender", { drm: 1, grn: 1, lun: 1 }],
+    ["Woodsmoke from a fire", "c_campfire", { poi: 1, hed: 1, anc: 1 }],
+  ]},
+  { text: "When you're stressed, you…", style: "list", options: [
+    ["Need quiet and the dark", null, { lun: 1, drm: 1, hed: 1 }],
+    ["Go outside immediately", null, { nat: 2, ele: 1 }],
+    ["Clean the house and cook", null, { kit: 2 }],
+    ["Call family", null, { her: 2, anc: 1 }],
+    ["Breathe and re-centre", null, { nrg: 2 }],
+    ["Make a plan", null, { cer: 1, sec: 1 }],
+    ["Look up and remember how small it all is", null, { cos: 2 }],
+    ["Ask for a sign", null, { ang: 2 }],
+  ]},
+  { text: "What's your favourite time of year?", style: "list", options: [
+    ["All of them. I mark every season", null, { wic: 2, nat: 1 }],
+    ["Autumn and Halloween", null, { anc: 1, poi: 1, hed: 1, tra: 1 }],
+    ["Midwinter, the longest nights", null, { cos: 1, kit: 1, lun: 1 }],
+    ["Spring, when everything grows back", null, { grn: 2 }],
+    ["High summer", null, { ele: 1, ang: 1, nrg: 1 }],
+  ]},
+];
+
+const answers = new Array(QUESTIONS.length).fill(null);
+let currentIndex = 0;
+const byId = (id) => document.getElementById(id);
+
+function makeImage(photoKey, altText) {
+  const image = document.createElement("img");
+  image.src = PHOTOS[photoKey].thumb;
+  image.alt = altText;
+  image.loading = "lazy";
+  return image;
+}
+
+function buildOption(question, option, optionIndex) {
+  const [label, visual] = option;
+  const button = document.createElement("button");
+  button.className = "option" + (answers[currentIndex] === optionIndex ? " selected" : "");
+  button.setAttribute("aria-pressed", answers[currentIndex] === optionIndex);
+
+  if (question.style === "photo") {
+    button.classList.add("photo-option");
+    if (visual) {
+      button.appendChild(makeImage(visual, label));
+    } else {
+      // Deliberately blank tile: the answer is "nothing much"
+      const blankTile = document.createElement("div");
+      blankTile.className = "no-photo";
+      blankTile.textContent = "(empty)";
+      button.appendChild(blankTile);
+    }
+  } else if (question.style === "swatch") {
+    const swatchStrip = document.createElement("div");
+    swatchStrip.className = "swatches";
+    visual.forEach((colour) => {
+      const swatch = document.createElement("i");
+      swatch.style.background = colour;
+      swatchStrip.appendChild(swatch);
+    });
+    button.appendChild(swatchStrip);
+  }
+
+  const caption = document.createElement("span");
+  caption.textContent = label;
+  button.appendChild(caption);
+
+  button.addEventListener("click", () => {
+    answers[currentIndex] = optionIndex;
+    byId("error").textContent = "";
+    renderQuestion();
+  });
+  return button;
+}
+
+function renderQuestion() {
+  const question = QUESTIONS[currentIndex];
+  const percentComplete = Math.round((currentIndex / QUESTIONS.length) * 100);
+  byId("count").textContent = `Question ${currentIndex + 1} of ${QUESTIONS.length}`;
+  byId("percent").textContent = `${percentComplete}%`;
+  byId("progress").style.width = `${percentComplete}%`;
+  byId("question").textContent = question.text;
+
+  const optionsContainer = byId("options");
+  optionsContainer.className = question.style === "photo" ? "grid" : "list";
+  optionsContainer.replaceChildren(...question.options.map((option, optionIndex) => buildOption(question, option, optionIndex)));
+
+  byId("back").style.visibility = currentIndex === 0 ? "hidden" : "visible";
+  byId("next").textContent = currentIndex === QUESTIONS.length - 1 ? "See my result" : "Next →";
+}
+
+function tallyScores() {
+  const scores = Object.fromEntries(Object.keys(WITCH_TYPES).map((typeKey) => [typeKey, 0]));
+  answers.forEach((optionIndex, questionIndex) => {
+    const points = QUESTIONS[questionIndex].options[optionIndex][2];
+    Object.entries(points).forEach(([typeKey, value]) => { scores[typeKey] += value; });
+  });
+  return Object.entries(scores).sort((first, second) => second[1] - first[1]);
+}
+
+function renderResult() {
+  const rankedTypes = tallyScores();
+  const [topKey, topScore] = rankedTypes[0];
+  const [topName, topPhoto, topDescription] = WITCH_TYPES[topKey];
+
+  const card = document.createElement("div");
+  card.className = "result-card";
+  card.appendChild(makeImage(topPhoto, topName));
+  const body = document.createElement("div");
+  body.className = "result-body";
+  body.innerHTML = '<p class="eyebrow">You are a…</p><h2></h2><p></p>';
+  body.querySelector("h2").textContent = topName;
+  body.querySelector("p:last-child").textContent = topDescription;
+  card.appendChild(body);
+
+  const runnersHeading = document.createElement("h2");
+  runnersHeading.textContent = "Your next closest matches";
+  runnersHeading.style.fontSize = "18px";
+
+  const runnerRows = rankedTypes.slice(1, 5).map(([typeKey, score]) => {
+    const row = document.createElement("div");
+    row.className = "runner";
+    row.innerHTML = '<span class="name"></span><div class="bar"><div></div></div><span class="score"></span>';
+    row.querySelector(".name").textContent = WITCH_TYPES[typeKey][0];
+    row.querySelector(".bar > div").style.width = `${Math.round((score / topScore) * 100)}%`;
+    row.querySelector(".score").textContent = score;
+    return row;
+  });
+
+  const actions = document.createElement("div");
+  actions.className = "actions";
+  const retakeButton = document.createElement("button");
+  retakeButton.textContent = "Retake the quiz";
+  retakeButton.addEventListener("click", () => {
+    answers.fill(null);
+    currentIndex = 0;
+    byId("result").hidden = true;
+    byId("quiz").hidden = false;
+    renderQuestion();
+  });
+  actions.appendChild(retakeButton);
+
+  byId("result").replaceChildren(card, runnersHeading, ...runnerRows, actions);
+  byId("quiz").hidden = true;
+  byId("result").hidden = false;
+  window.scrollTo({ top: 0, behavior: "smooth" });
+}
+
+function renderCredits() {
+  // Built with textContent because artist names come from Commons, not from this file
+  const creditItems = Object.values(PHOTOS).map((photo) => {
+    const item = document.createElement("li");
+    const link = document.createElement("a");
+    link.href = photo.page;
+    link.target = "_blank";
+    link.rel = "noopener";
+    link.textContent = photo.title.replace(/^File:/, "");
+    item.append(link, ` by ${photo.artist || "unknown"} (${photo.license || "see source"})`);
+    return item;
+  });
+  byId("credits").replaceChildren(...creditItems);
+}
+
+byId("next").addEventListener("click", () => {
+  if (answers[currentIndex] === null) {
+    byId("error").textContent = "Pick an answer first.";
+    return;
+  }
+  if (currentIndex < QUESTIONS.length - 1) {
+    currentIndex += 1;
+    renderQuestion();
+    window.scrollTo({ top: 0 });
+  } else {
+    renderResult();
+  }
+});
+byId("back").addEventListener("click", () => {
+  if (currentIndex > 0) {
+    currentIndex -= 1;
+    renderQuestion();
+  }
+});
+
+renderCredits();
+renderQuestion();
+</script>
+</body>
+</html>
